@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>AquaGuardian — Groundwater Intelligence Platform</title>
+<link href="https://fonts.googleapis.com/css2?family=Clash+Display:wght@400;500;600;700&family=Cabinet+Grotesk:wght@300;400;500;700&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg0:     #03060d;
+  --bg1:     #060d1a;
+  --bg2:     #091527;
+  --glass:   rgba(255,255,255,0.032);
+  --border:  rgba(255,255,255,0.065);
+  --border-h:rgba(0,210,255,0.2);
+  --c1: #00d4ff;
+  --c2: #00ffc8;
+  --c3: #0066ff;
+  --safe: #00e87a;
+  --warn: #ffb020;
+  --crit: #ff3d5a;
+  --txt0: #f0f8ff;
+  --txt1: #8aa8c8;
+  --txt2: #4a6880;
+  --sw: 240px;
+  --r: 16px;
+  --rs: 10px;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html{scroll-behavior:smooth;}
+body{font-family:'Cabinet Grotesk',sans-serif;background:var(--bg0);color:var(--txt0);min-height:100vh;display:flex;overflow-x:hidden;}
+
+/* AMBIENT */
+.amb{position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden;}
+.orb{position:absolute;border-radius:50%;filter:blur(90px);opacity:.1;animation:drift 20s ease-in-out infinite alternate;}
+.orb:nth-child(1){width:700px;height:700px;background:radial-gradient(circle,var(--c1),transparent 70%);top:-250px;left:-150px;animation-duration:22s;}
+.orb:nth-child(2){width:550px;height:550px;background:radial-gradient(circle,var(--c2),transparent 70%);bottom:-180px;right:50px;animation-duration:26s;animation-delay:-9s;}
+.orb:nth-child(3){width:400px;height:400px;background:radial-gradient(circle,var(--c3),transparent 70%);top:45%;left:42%;animation-duration:18s;animation-delay:-5s;}
+@keyframes drift{from{transform:translate(0,0) scale(1);}to{transform:translate(35px,28px) scale(1.08);}}
+.amb::after{content:'';position:absolute;inset:0;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");opacity:.022;mix-blend-mode:overlay;}
+
+/* SIDEBAR */
+.sb{position:fixed;left:0;top:0;bottom:0;width:var(--sw);z-index:50;background:rgba(6,13,26,.82);backdrop-filter:blur(28px);border-right:1px solid var(--border);display:flex;flex-direction:column;padding-bottom:1.5rem;}
+.sb-logo{padding:1.4rem 1.4rem .9rem;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border);margin-bottom:.4rem;}
+.lmark{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,var(--c1),var(--c2));display:flex;align-items:center;justify-content:center;font-size:1.1rem;box-shadow:0 4px 18px rgba(0,212,255,.38);flex-shrink:0;}
+.ltext{font-family:'Clash Display',sans-serif;font-weight:700;font-size:1rem;color:var(--txt0);letter-spacing:-.02em;line-height:1.1;}
+.ltext span{color:var(--c1);}
+.lver{font-size:.58rem;color:var(--txt2);text-transform:uppercase;letter-spacing:.1em;}
+.nsec{padding:.4rem 1.4rem .2rem;font-size:.62rem;text-transform:uppercase;letter-spacing:.13em;color:var(--txt2);margin-top:.3rem;}
+.ni{display:flex;align-items:center;gap:9px;padding:.55rem 1.4rem;margin:0 .5rem;border-radius:var(--rs);font-size:.83rem;font-weight:500;color:var(--txt1);cursor:pointer;transition:all .2s;text-decoration:none;position:relative;}
+.ni:hover{background:var(--glass);color:var(--txt0);}
+.ni.on{background:linear-gradient(90deg,rgba(0,212,255,.11),transparent);color:var(--c1);border:1px solid rgba(0,212,255,.12);}
+.ni.on::before{content:'';position:absolute;left:0;top:22%;bottom:22%;width:3px;border-radius:0 3px 3px 0;background:var(--c1);box-shadow:0 0 10px var(--c1);}
+.ni-ic{font-size:.95rem;width:20px;text-align:center;}
+.sbfoot{margin-top:auto;padding:.9rem 1.4rem 0;border-top:1px solid var(--border);}
+.spill{display:flex;align-items:center;gap:8px;background:var(--glass);border:1px solid var(--border);border-radius:8px;padding:.55rem .8rem;font-size:.73rem;color:var(--txt1);}
+.pdot{width:7px;height:7px;border-radius:50%;background:var(--safe);box-shadow:0 0 8px var(--safe);animation:pulse 2s ease-in-out infinite;flex-shrink:0;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.3;}}
+
+/* MAIN */
+.main{margin-left:var(--sw);flex:1;position:relative;z-index:1;min-height:100vh;display:flex;flex-direction:column;}
+
+/* TOPBAR */
+.tb{position:sticky;top:0;z-index:40;height:58px;display:flex;align-items:center;justify-content:space-between;padding:0 2.5rem;background:rgba(3,6,13,.72);backdrop-filter:blur(22px);border-bottom:1px solid var(--border);}
+.tbl{display:flex;align-items:center;gap:.5rem;font-size:.78rem;color:var(--txt2);}
+.tbl strong{color:var(--txt1);font-weight:500;}
+.tbr{display:flex;align-items:center;gap:.7rem;}
+.tbg{font-size:.7rem;padding:3px 10px;border-radius:20px;font-weight:600;letter-spacing:.04em;}
+.tbg.live{background:rgba(0,232,122,.1);border:1px solid rgba(0,232,122,.22);color:var(--safe);}
+.tbg.dt{background:var(--glass);border:1px solid var(--border);color:var(--txt2);}
+.ava{width:31px;height:31px;border-radius:50%;background:linear-gradient(135deg,var(--c3),var(--c1));display:flex;align-items:center;justify-content:center;font-size:.72rem;font-weight:700;color:#fff;box-shadow:0 2px 12px rgba(0,102,255,.38);}
+
+/* PAGE */
+.pg{padding:2.5rem;display:flex;flex-direction:column;gap:1.8rem;flex:1;}
+
+/* PAGE HEADER */
+.ph{display:flex;align-items:flex-start;justify-content:space-between;gap:1.5rem;}
+.ph-ey{font-size:.7rem;text-transform:uppercase;letter-spacing:.15em;color:var(--c1);font-weight:600;margin-bottom:.35rem;display:flex;align-items:center;gap:6px;}
+.ph-ey::before{content:'';display:inline-block;width:16px;height:2px;background:var(--c1);border-radius:1px;}
+.ph-t{font-family:'Clash Display',sans-serif;font-weight:700;font-size:clamp(1.9rem,3.2vw,2.7rem);letter-spacing:-.04em;line-height:1.05;background:linear-gradient(130deg,#fff 25%,var(--c1) 65%,var(--c2) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+.ph-s{margin-top:.45rem;font-size:.88rem;color:var(--txt1);max-width:460px;line-height:1.6;}
+
+/* WATER INDEX HERO */
+.wih{flex-shrink:0;background:var(--glass);border:1px solid var(--border);border-radius:var(--r);padding:1.3rem 1.9rem;text-align:center;min-width:165px;position:relative;overflow:hidden;backdrop-filter:blur(20px);box-shadow:0 8px 48px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,.05);}
+.wih::before{content:'';position:absolute;top:-40px;right:-40px;width:110px;height:110px;border-radius:50%;background:radial-gradient(circle,rgba(0,212,255,.18),transparent 70%);pointer-events:none;}
+.wil{font-size:.62rem;text-transform:uppercase;letter-spacing:.14em;color:var(--txt2);margin-bottom:.25rem;}
+.win{font-family:'Clash Display',sans-serif;font-size:3.1rem;font-weight:700;line-height:1;transition:color .8s;}
+.win.ok{color:var(--safe);text-shadow:0 0 28px rgba(0,232,122,.5);}
+.win.wn{color:var(--warn);text-shadow:0 0 28px rgba(255,176,32,.5);}
+.win.bd{color:var(--crit);text-shadow:0 0 28px rgba(255,61,90,.5);}
+.wis{font-size:.73rem;color:var(--txt2);margin-top:3px;}
+.wit{margin-top:.75rem;height:4px;background:rgba(255,255,255,.07);border-radius:2px;overflow:hidden;}
+.wip{height:100%;border-radius:2px;transition:width 1.2s cubic-bezier(.34,1.56,.64,1),background .8s;}
+
+/* KPI GRID */
+.kg{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;}
+.kc{background:var(--glass);border:1px solid var(--border);border-radius:var(--r);padding:1.3rem 1.4rem;position:relative;overflow:hidden;backdrop-filter:blur(16px);transition:transform .25s,border-color .25s,box-shadow .25s;cursor:default;}
+.kc:hover{transform:translateY(-3px);border-color:var(--border-h);box-shadow:0 12px 40px rgba(0,0,0,.35),0 0 0 1px rgba(0,212,255,.07);}
+.kc::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2px;border-radius:0 0 var(--r) var(--r);opacity:0;transition:opacity .3s;}
+.kc:hover::after{opacity:1;}
+.kc.a::after{background:linear-gradient(90deg,transparent,var(--c1),transparent);}
+.kc.b::after{background:linear-gradient(90deg,transparent,var(--c2),transparent);}
+.kc.c::after{background:linear-gradient(90deg,transparent,var(--warn),transparent);}
+.kc.d::after{background:linear-gradient(90deg,transparent,var(--crit),transparent);}
+.kt{display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem;}
+.ki{width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:.9rem;}
+.ki.a{background:rgba(0,212,255,.11);}
+.ki.b{background:rgba(0,255,200,.11);}
+.ki.c{background:rgba(255,176,32,.11);}
+.ki.d{background:rgba(255,61,90,.10);}
+.kd{font-size:.7rem;padding:2px 7px;border-radius:12px;font-weight:600;}
+.kd.dn{background:rgba(255,61,90,.11);color:var(--crit);}
+.kd.up{background:rgba(0,232,122,.11);color:var(--safe);}
+.kd.fl{background:rgba(255,255,255,.05);color:var(--txt2);}
+.kv{font-family:'Clash Display',sans-serif;font-size:1.7rem;font-weight:700;letter-spacing:-.02em;line-height:1;color:var(--txt0);transition:all .6s;}
+.klb{font-size:.73rem;color:var(--txt2);margin-top:3px;}
+.ksp{margin-top:.7rem;height:30px;}
+
+/* GCARD */
+.gc{background:var(--glass);border:1px solid var(--border);border-radius:var(--r);backdrop-filter:blur(20px);box-shadow:0 4px 32px rgba(0,0,0,.28);overflow:hidden;transition:border-color .3s;}
+.gc:hover{border-color:var(--border-h);}
+.gch{display:flex;align-items:center;justify-content:space-between;padding:1.25rem 1.5rem 0;}
+.gct{display:flex;align-items:center;gap:8px;font-family:'Clash Display',sans-serif;font-size:.93rem;font-weight:600;color:var(--txt0);}
+.gco{width:27px;height:27px;border-radius:7px;background:rgba(0,212,255,.1);display:flex;align-items:center;justify-content:center;font-size:.78rem;}
+.gbg{font-size:.63rem;text-transform:uppercase;letter-spacing:.1em;padding:2px 9px;border-radius:20px;font-weight:600;}
+.bg-lv{background:rgba(0,232,122,.09);border:1px solid rgba(0,232,122,.2);color:var(--safe);}
+.bg-ai{background:rgba(0,212,255,.09);border:1px solid rgba(0,212,255,.2);color:var(--c1);}
+.bg-wn{background:rgba(255,176,32,.09);border:1px solid rgba(255,176,32,.2);color:var(--warn);}
+.bg-cr{background:rgba(255,61,90,.09);border:1px solid rgba(255,61,90,.2);color:var(--crit);}
+.gcb{padding:1.1rem 1.5rem 1.5rem;}
+
+/* MAP */
+.mw{position:relative;aspect-ratio:16/7;background:rgba(5,14,32,.6);border-top:1px solid var(--border);overflow:hidden;}
+#kzm{width:100%;height:100%;display:block;}
+.mtt{position:absolute;pointer-events:none;background:rgba(5,15,32,.96);border:1px solid var(--border-h);border-radius:8px;padding:6px 13px;font-size:.73rem;color:var(--txt0);backdrop-filter:blur(12px);opacity:0;transition:opacity .15s;white-space:nowrap;z-index:30;box-shadow:0 4px 20px rgba(0,0,0,.5);}
+.mleg{display:flex;gap:1.1rem;flex-wrap:wrap;margin-top:.3rem;}
+.mli{display:flex;align-items:center;gap:5px;font-size:.72rem;color:var(--txt2);}
+.mld{width:8px;height:8px;border-radius:50%;}
+
+/* FORECAST */
+.fc-inner{display:flex;flex-direction:column;gap:.9rem;}
+.fcs{background:rgba(0,0,0,.2);border:1px solid var(--border);border-radius:var(--rs);padding:.85rem 1rem;}
+.fcs-l{font-size:.65rem;text-transform:uppercase;letter-spacing:.1em;color:var(--txt2);margin-bottom:2px;}
+.fcs-v{font-family:'Clash Display',sans-serif;font-size:1.35rem;font-weight:700;transition:color .6s;}
+.fcs-v.ok{color:var(--safe);}
+.fcs-v.wn{color:var(--warn);}
+.fcs-v.bd{color:var(--crit);}
+.fct{font-size:.81rem;line-height:1.75;color:var(--txt1);}
+.fct .hl{color:var(--warn);font-weight:600;}
+.fct .hlr{color:var(--crit);font-weight:600;}
+.fct .hlg{color:var(--safe);font-weight:600;}
+.fcc{font-size:.7rem;color:var(--txt2);display:flex;align-items:center;gap:6px;}
+.ccb{flex:1;height:3px;background:rgba(255,255,255,.06);border-radius:2px;overflow:hidden;}
+.ccf{height:100%;border-radius:2px;background:linear-gradient(90deg,var(--c1),var(--c2));transition:width 1s;}
+
+/* TWO/THREE COL */
+.tc{display:grid;grid-template-columns:1.5fr 1fr;gap:1.5rem;align-items:start;}
+.thr{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1.5rem;}
+
+/* CHART */
+.cw{position:relative;height:198px;}
+
+/* RECS */
+.rl{display:flex;flex-direction:column;gap:.65rem;}
+.rc{display:flex;gap:.8rem;align-items:flex-start;background:rgba(0,0,0,.14);border:1px solid var(--border);border-radius:var(--rs);padding:.8rem .95rem;transition:all .3s;}
+.rc:hover{background:rgba(0,212,255,.04);border-color:rgba(0,212,255,.14);}
+.rc.urg{background:rgba(255,61,90,.05);border-color:rgba(255,61,90,.2);}
+.rc.urg:hover{background:rgba(255,61,90,.08);border-color:rgba(255,61,90,.28);}
+.rn{width:25px;height:25px;border-radius:7px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:.7rem;font-weight:700;background:rgba(0,212,255,.1);color:var(--c1);}
+.rc.urg .rn{background:rgba(255,61,90,.1);color:var(--crit);}
+.rt{font-size:.81rem;font-weight:700;color:var(--txt0);margin-bottom:2px;}
+.rc.urg .rt{color:var(--crit);}
+.rd{font-size:.75rem;color:var(--txt2);line-height:1.5;}
+
+/* ANALYZE */
+.az{background:var(--glass);border:1px solid var(--border);border-radius:var(--r);backdrop-filter:blur(20px);padding:1.9rem 2.5rem;display:flex;align-items:center;justify-content:space-between;gap:2rem;position:relative;overflow:hidden;}
+.az::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--c1),var(--c2),transparent);opacity:.35;}
+.az::after{content:'';position:absolute;inset:0;pointer-events:none;background:radial-gradient(ellipse 55% 100% at 78% 50%,rgba(0,212,255,.04),transparent);}
+.az-ey{font-size:.66rem;text-transform:uppercase;letter-spacing:.14em;color:var(--c1);font-weight:600;margin-bottom:.3rem;}
+.az-t{font-family:'Clash Display',sans-serif;font-size:1.3rem;font-weight:700;color:var(--txt0);letter-spacing:-.02em;}
+.az-d{font-size:.81rem;color:var(--txt1);margin-top:.25rem;max-width:370px;line-height:1.5;}
+.az-r{display:flex;flex-direction:column;align-items:flex-end;gap:.7rem;flex-shrink:0;}
+#abtn{position:relative;overflow:hidden;padding:.8rem 2.4rem;font-family:'Clash Display',sans-serif;font-weight:600;font-size:.93rem;letter-spacing:.02em;color:var(--bg0);background:linear-gradient(135deg,var(--c1),var(--c2));border:none;border-radius:50px;cursor:pointer;box-shadow:0 4px 22px rgba(0,212,255,.38);transition:transform .2s,box-shadow .2s,opacity .2s;white-space:nowrap;}
+#abtn:hover:not(:disabled){transform:translateY(-2px);box-shadow:0 8px 38px rgba(0,212,255,.52),0 0 0 4px rgba(0,212,255,.08);}
+#abtn:active:not(:disabled){transform:scale(.97);}
+#abtn:disabled{opacity:.5;cursor:not-allowed;}
+#abtn .bg{position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,.2),transparent 60%);border-radius:inherit;}
+.rpe{position:absolute;border-radius:50%;background:rgba(255,255,255,.25);transform:scale(0);animation:rpa .6s linear forwards;pointer-events:none;}
+@keyframes rpa{to{transform:scale(4);opacity:0;}}
+#lrow{display:none;align-items:center;gap:8px;font-size:.78rem;color:var(--c1);}
+#lrow.on{display:flex;}
+.sp{width:15px;height:15px;border-radius:50%;border:2px solid rgba(0,212,255,.18);border-top-color:var(--c1);animation:spin .7s linear infinite;flex-shrink:0;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.rc-count{font-size:.68rem;color:var(--txt2);text-align:right;}
+
+/* ANIM */
+@keyframes fiu{from{opacity:0;transform:translateY(14px);}to{opacity:1;transform:translateY(0);}}
+.anim{animation:fiu .5s ease forwards;opacity:0;}
+.anim:nth-child(1){animation-delay:.04s;}
+.anim:nth-child(2){animation-delay:.09s;}
+.anim:nth-child(3){animation-delay:.14s;}
+.anim:nth-child(4){animation-delay:.19s;}
+.anim:nth-child(5){animation-delay:.24s;}
+.anim:nth-child(6){animation-delay:.29s;}
+.snap{animation:fiu .4s ease forwards;opacity:0;}
+
+/* RESPONSIVE */
+@media(max-width:1100px){.kg{grid-template-columns:1fr 1fr;}.tc{grid-template-columns:1fr;}.thr{grid-template-columns:1fr;}}
+@media(max-width:768px){:root{--sw:0px;}.sb{transform:translateX(-100%);}.tb{padding:0 1.2rem;}.pg{padding:1.4rem 1rem;}.kg{grid-template-columns:1fr 1fr;}.ph{flex-direction:column;}.az{flex-direction:column;align-items:flex-start;}.az-r{align-items:flex-start;width:100%;}#abtn{width:100%;}}
+::-webkit-scrollbar{width:5px;}::-webkit-scrollbar-track{background:var(--bg0);}::-webkit-scrollbar-thumb{background:rgba(255,255,255,.07);border-radius:3px;}
+.kc {
+  background: var(--glass);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 1.3rem 1.4rem;
+  min-height: 160px; /* Установи желаемую высоту */
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between; /* Распределит контент внутри равномерно */
+}
+
+/* Ограничиваем высоту спарклайнов (маленьких графиков) */
+.ksp {
+  margin-top: auto;
+  height: 40px !important; /* Жестко задаем высоту графика */
+  max-height: 40px;
+}
+</style>
+</head>
+<body>
+
+<div class="amb"><div class="orb"></div><div class="orb"></div><div class="orb"></div></div>
+
+<!-- SIDEBAR -->
+<aside class="sb">
+  <div class="sb-logo">
+    <div class="lmark">💧</div>
+    <div><div class="ltext">Aqua<span>Guardian</span></div><div class="lver">v2.4 · Beta</div></div>
+  </div>
+  <div class="nsec">Platform</div>
+  <a class="ni on" href="#"><span class="ni-ic">◼</span>Dashboard</a>
+  <a class="ni" href="#"><span class="ni-ic">◈</span>Analytics</a>
+  <a class="ni" href="#"><span class="ni-ic">◉</span>Forecast</a>
+  <a class="ni" href="#"><span class="ni-ic">◇</span>Regions</a>
+  <div class="nsec">Management</div>
+  <a class="ni" href="#"><span class="ni-ic">◌</span>Sensors</a>
+  <a class="ni" href="#"><span class="ni-ic">▽</span>Reports</a>
+  <a class="ni" href="#"><span class="ni-ic">◎</span>Alerts<span style="margin-left:auto;background:rgba(255,61,90,.15);color:var(--crit);font-size:.6rem;padding:1px 6px;border-radius:10px;font-weight:700">4</span></a>
+  <a class="ni" href="#"><span class="ni-ic">◱</span>Settings</a>
+  <div class="sbfoot">
+    <div class="spill"><div class="pdot"></div><span>183 sensors online</span></div>
+  </div>
+</aside>
+
+<!-- MAIN -->
+<div class="main">
+  <header class="tb">
+    <div class="tbl"><strong>Kazakhstan</strong><span style="opacity:.4">/</span><span>Overview</span></div>
+    <div class="tbr">
+      <span class="tbg live">● Live</span>
+      <span class="tbg dt" id="topdate">—</span>
+      <div class="ava">KZ</div>
+    </div>
+  </header>
+
+  <div class="pg">
+
+    <!-- HEADER -->
+    <div class="ph anim">
+      <div>
+        <div class="ph-ey">Groundwater Intelligence</div>
+        <h1 class="ph-t">AquaGuardian AI</h1>
+        <p class="ph-s">Smart monitoring and prediction of groundwater conditions across Kazakhstan — powered by satellite telemetry and predictive AI.</p>
+      </div>
+      <div class="wih">
+        <div class="wil">Water Index</div>
+        <div class="win ok" id="win">72</div>
+        <div class="wis" id="wis">/ 100 · Stable</div>
+        <div class="wit"><div class="wip" id="wip" style="width:72%;background:linear-gradient(90deg,var(--safe),var(--c2))"></div></div>
+      </div>
+    </div>
+
+    <!-- KPIs -->
+    <div class="kg">
+      <div class="kc a anim">
+        <div class="kt"><div class="ki a">📉</div><span class="kd dn" id="d1">▼ 0.8m / yr</span></div>
+        <div class="kv" id="kv1">−4.2 m</div><div class="klb">Avg. Groundwater Depth</div>
+        <canvas class="ksp" id="sp1"></canvas>
+      </div>
+      <div class="kc b anim">
+        <div class="kt"><div class="ki b">🌧️</div><span class="kd dn" id="d2">▼ 12% YoY</span></div>
+        <div class="kv" id="kv2">248 mm</div><div class="klb">Annual Precipitation</div>
+        <canvas class="ksp" id="sp2"></canvas>
+      </div>
+      <div class="kc c anim">
+        <div class="kt"><div class="ki c">🏭</div><span class="kd dn" id="d3">▲ 6% quota</span></div>
+        <div class="kv" id="kv3">2.4 km³</div><div class="klb">Industrial Extraction</div>
+        <canvas class="ksp" id="sp3"></canvas>
+      </div>
+      <div class="kc d anim">
+        <div class="kt"><div class="ki d">🔴</div><span class="kd fl" id="d4">5 regions</span></div>
+        <div class="kv" id="kv4">3 / 14</div><div class="klb">Critical Regions</div>
+        <canvas class="ksp" id="sp4"></canvas>
+      </div>
+    </div>
+
+    <!-- MAP + FORECAST -->
+    <div class="tc">
+      <div class="gc anim">
+        <div class="gch">
+          <div class="gct"><div class="gco">🗺️</div>Regional Groundwater Map</div>
+          <span class="gbg bg-lv">Live</span>
+        </div>
+        <div class="gcb" style="padding-bottom:.7rem">
+          <div class="mleg">
+            <div class="mli"><div class="mld" style="background:var(--safe);box-shadow:0 0 5px var(--safe)"></div>Safe (&gt; −3 m)</div>
+            <div class="mli"><div class="mld" style="background:var(--warn);box-shadow:0 0 5px var(--warn)"></div>At Risk (−3 to −5 m)</div>
+            <div class="mli"><div class="mld" style="background:var(--crit);box-shadow:0 0 5px var(--crit)"></div>Critical (&lt; −5 m)</div>
+          </div>
+        </div>
+        <div class="mw">
+          <div class="mtt" id="mtt"></div>
+          <svg id="kzm" viewBox="0 0 900 400" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">
+            <defs>
+              <filter id="gf"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+              <radialGradient id="bgr" cx="50%" cy="50%" r="70%"><stop offset="0%" stop-color="#071830"/><stop offset="100%" stop-color="#03060d"/></radialGradient>
+            </defs>
+            <rect width="900" height="400" fill="url(#bgr)"/>
+            <g stroke="rgba(0,150,255,.04)" stroke-width="1">
+              <line x1="0" y1="100" x2="900" y2="100"/><line x1="0" y1="200" x2="900" y2="200"/>
+              <line x1="0" y1="300" x2="900" y2="300"/><line x1="225" y1="0" x2="225" y2="400"/>
+              <line x1="450" y1="0" x2="450" y2="400"/><line x1="675" y1="0" x2="675" y2="400"/>
+            </g>
+            <path d="M 120,60 L 180,40 L 260,30 L 350,40 L 430,30 L 510,20 L 600,35 L 680,55 L 750,80 L 800,110 L 830,150 L 840,200 L 820,250 L 790,290 L 740,320 L 680,340 L 600,350 L 520,360 L 440,355 L 360,345 L 280,355 L 200,340 L 140,310 L 90,270 L 70,220 L 75,160 L 90,110 Z" fill="rgba(8,25,55,.5)" stroke="rgba(0,180,255,.13)" stroke-width="2"/>
+            <!-- Critical regions -->
+            <path class="rg" data-n="West Kazakhstan" data-s="critical" data-v="−6.8 m" d="M 90,180 L 130,155 L 155,180 L 160,230 L 130,260 L 90,245 Z" fill="rgba(255,61,90,.22)" stroke="rgba(255,61,90,.7)" stroke-width="1.5" filter="url(#gf)"/>
+            <text x="122" y="213" text-anchor="middle" fill="rgba(255,110,130,.9)" font-size="10" font-family="Cabinet Grotesk,sans-serif" font-weight="600">West KZ</text>
+            <path class="rg" data-n="Atyrau" data-s="critical" data-v="−7.1 m" d="M 88,130 L 130,120 L 155,155 L 130,155 L 90,180 Z" fill="rgba(255,61,90,.2)" stroke="rgba(255,61,90,.6)" stroke-width="1.5"/>
+            <text x="115" y="148" text-anchor="middle" fill="rgba(255,110,130,.9)" font-size="9.5" font-family="Cabinet Grotesk,sans-serif">Atyrau</text>
+            <path class="rg" data-n="Mangystau" data-s="critical" data-v="−8.2 m" d="M 88,245 L 130,260 L 140,310 L 100,320 L 82,290 Z" fill="rgba(255,61,90,.22)" stroke="rgba(255,61,90,.6)" stroke-width="1.5"/>
+            <text x="108" y="290" text-anchor="middle" fill="rgba(255,110,130,.9)" font-size="9.5" font-family="Cabinet Grotesk,sans-serif">Mangystau</text>
+            <path class="rg" data-n="Kyzylorda" data-s="critical" data-v="−7.5 m" d="M 165,220 L 220,190 L 260,210 L 295,260 L 260,295 L 200,300 L 155,270 Z" fill="rgba(255,61,90,.22)" stroke="rgba(255,61,90,.6)" stroke-width="1.5"/>
+            <text x="220" y="252" text-anchor="middle" fill="rgba(255,110,130,.9)" font-size="10" font-family="Cabinet Grotesk,sans-serif">Kyzylorda</text>
+            <path class="rg" data-n="Turkestan" data-s="critical" data-v="−6.2 m" d="M 200,300 L 270,295 L 260,340 L 220,358 L 170,350 L 150,320 Z" fill="rgba(255,61,90,.2)" stroke="rgba(255,61,90,.55)" stroke-width="1.5"/>
+            <text x="210" y="332" text-anchor="middle" fill="rgba(255,110,130,.9)" font-size="10" font-family="Cabinet Grotesk,sans-serif">Turkestan</text>
+            <!-- Risk regions -->
+            <path class="rg" data-n="Aktobe" data-s="risk" data-v="−4.5 m" d="M 155,100 L 220,80 L 255,100 L 260,160 L 220,190 L 165,180 L 155,155 L 130,120 Z" fill="rgba(255,176,32,.17)" stroke="rgba(255,176,32,.5)" stroke-width="1.5"/>
+            <text x="200" y="142" text-anchor="middle" fill="rgba(255,195,70,.9)" font-size="10" font-family="Cabinet Grotesk,sans-serif">Aktobe</text>
+            <path class="rg" data-n="Karaganda" data-s="risk" data-v="−3.9 m" d="M 340,160 L 400,170 L 450,200 L 440,260 L 380,280 L 310,260 L 295,200 Z" fill="rgba(255,176,32,.15)" stroke="rgba(255,176,32,.48)" stroke-width="1.5"/>
+            <text x="372" y="222" text-anchor="middle" fill="rgba(255,195,70,.9)" font-size="10" font-family="Cabinet Grotesk,sans-serif">Karaganda</text>
+            <path class="rg" data-n="Zhambyl" data-s="risk" data-v="−4.8 m" d="M 310,260 L 380,280 L 395,330 L 330,355 L 270,340 L 260,300 Z" fill="rgba(255,176,32,.17)" stroke="rgba(255,176,32,.5)" stroke-width="1.5"/>
+            <text x="330" y="312" text-anchor="middle" fill="rgba(255,195,70,.9)" font-size="10" font-family="Cabinet Grotesk,sans-serif">Zhambyl</text>
+            <path class="rg" data-n="Almaty Region" data-s="risk" data-v="−4.1 m" d="M 440,260 L 520,255 L 540,300 L 490,345 L 420,345 L 395,310 L 395,280 Z" fill="rgba(255,176,32,.15)" stroke="rgba(255,176,32,.48)" stroke-width="1.5"/>
+            <text x="468" y="305" text-anchor="middle" fill="rgba(255,195,70,.9)" font-size="10" font-family="Cabinet Grotesk,sans-serif">Almaty</text>
+            <!-- Safe regions -->
+            <path class="rg" data-n="Kostanay" data-s="safe" data-v="−2.1 m" d="M 220,40 L 320,35 L 345,80 L 310,120 L 255,130 L 220,100 L 220,80 Z" fill="rgba(0,232,122,.14)" stroke="rgba(0,232,122,.48)" stroke-width="1.5"/>
+            <text x="278" y="85" text-anchor="middle" fill="rgba(0,220,120,.9)" font-size="10" font-family="Cabinet Grotesk,sans-serif">Kostanay</text>
+            <path class="rg" data-n="North Kazakhstan" data-s="safe" data-v="−1.8 m" d="M 320,35 L 430,30 L 455,70 L 420,100 L 360,110 L 345,80 Z" fill="rgba(0,232,122,.14)" stroke="rgba(0,232,122,.48)" stroke-width="1.5"/>
+            <text x="385" y="68" text-anchor="middle" fill="rgba(0,220,120,.9)" font-size="10" font-family="Cabinet Grotesk,sans-serif">North KZ</text>
+            <path class="rg" data-n="Akmola" data-s="safe" data-v="−2.5 m" d="M 345,80 L 420,100 L 450,140 L 400,170 L 340,160 L 310,120 Z" fill="rgba(0,232,122,.12)" stroke="rgba(0,232,122,.4)" stroke-width="1.5"/>
+            <text x="378" y="133" text-anchor="middle" fill="rgba(0,220,120,.9)" font-size="10" font-family="Cabinet Grotesk,sans-serif">Akmola</text>
+            <path class="rg" data-n="Pavlodar" data-s="safe" data-v="−2.3 m" d="M 430,30 L 530,25 L 555,65 L 520,100 L 455,90 Z" fill="rgba(0,232,122,.13)" stroke="rgba(0,232,122,.44)" stroke-width="1.5"/>
+            <text x="487" y="62" text-anchor="middle" fill="rgba(0,220,120,.9)" font-size="10" font-family="Cabinet Grotesk,sans-serif">Pavlodar</text>
+            <path class="rg" data-n="East Kazakhstan" data-s="safe" data-v="−1.5 m" d="M 530,25 L 640,40 L 680,80 L 650,130 L 580,150 L 555,95 Z" fill="rgba(0,232,122,.15)" stroke="rgba(0,232,122,.48)" stroke-width="1.5"/>
+            <text x="600" y="90" text-anchor="middle" fill="rgba(0,220,120,.9)" font-size="10" font-family="Cabinet Grotesk,sans-serif">East KZ</text>
+            <!-- Cities -->
+            <circle class="rg" data-n="Shymkent" data-s="risk" data-v="−4.9 m" cx="250" cy="348" r="4" fill="var(--warn)" filter="url(#gf)"/>
+            <text x="250" y="362" text-anchor="middle" fill="var(--txt2)" font-size="8.5">Shymkent</text>
+            <circle class="rg" data-n="Almaty City" data-s="risk" data-v="−3.8 m" cx="510" cy="340" r="4" fill="var(--warn)" filter="url(#gf)"/>
+            <text x="510" y="354" text-anchor="middle" fill="var(--txt2)" font-size="8.5">Almaty</text>
+            <!-- Astana -->
+            <circle cx="410" cy="148" r="7" fill="var(--c1)" filter="url(#gf)"/>
+            <text x="410" y="166" text-anchor="middle" fill="var(--c1)" font-size="9.5" font-family="Cabinet Grotesk,sans-serif" font-weight="700">★ Astana</text>
+            <circle cx="410" cy="148" r="16" fill="none" stroke="rgba(0,212,255,.25)" stroke-width="1">
+              <animate attributeName="r" from="9" to="22" dur="2.2s" repeatCount="indefinite"/>
+              <animate attributeName="opacity" from=".5" to="0" dur="2.2s" repeatCount="indefinite"/>
+            </circle>
+            <!-- Aral Sea -->
+            <ellipse cx="133" cy="175" rx="21" ry="11" fill="rgba(0,70,130,.35)" stroke="rgba(0,140,210,.22)" stroke-width="1"/>
+            <text x="133" y="198" text-anchor="middle" fill="rgba(0,170,255,.38)" font-size="8">Aral Sea</text>
+          </svg>
+        </div>
+      </div>
+
+      <!-- FORECAST -->
+      <div class="gc anim">
+        <div class="gch">
+          <div class="gct"><div class="gco">🔮</div>AI Forecast</div>
+          <span class="gbg bg-ai" id="fcbadge">74% confidence</span>
+        </div>
+        <div class="gcb">
+          <div class="fc-inner">
+            <div class="fcs">
+              <div class="fcs-l">Projected 3-Year Change</div>
+              <div class="fcs-v wn" id="fcv">−20% water level</div>
+            </div>
+            <div class="fct" id="fct">Water levels are projected to <span class="hl">decrease by 20%</span> over the next <span class="hl">3 years</span> based on current precipitation deficits.<br><br>Primary risk zones: <span class="hlr">Kyzylorda, Mangystau, West Kazakhstan</span>. Continued overuse may cause irreversible desertification.</div>
+            <div class="fcc">
+              <span id="fccl">Model confidence: 74%</span>
+              <div class="ccb"><div class="ccf" id="ccf" style="width:74%"></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CHART + RECS -->
+    <div class="tc">
+      <div class="gc anim">
+        <div class="gch">
+          <div class="gct"><div class="gco">📊</div>Water Level Trend</div>
+          <span class="gbg bg-ai">2019 – 2026</span>
+        </div>
+        <div class="gcb"><div class="cw"><canvas id="mc"></canvas></div></div>
+      </div>
+      <div class="gc anim">
+        <div class="gch">
+          <div class="gct"><div class="gco">✅</div>Recommendations</div>
+          <span class="gbg bg-ai" id="rbadge">AI-generated</span>
+        </div>
+        <div class="gcb">
+          <div class="rl" id="rl">
+            <div class="rc"><div class="rn">1</div><div><div class="rt">Reduce Domestic Usage</div><div class="rd">Tiered pricing to cut household use 15–20%. Campaigns in Shymkent and Kyzylorda.</div></div></div>
+            <div class="rc"><div class="rn">2</div><div><div class="rt">Optimize Irrigation</div><div class="rd">Transition to drip irrigation in Turkestan & Zhambyl. Savings: 35–45% per season.</div></div></div>
+            <div class="rc"><div class="rn">3</div><div><div class="rt">Monitor Water Quality</div><div class="rd">Deploy 40 sensors in western regions. Increase sampling in Mangystau and Atyrau.</div></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ANALYZE -->
+    <div class="az anim">
+      <div>
+        <div class="az-ey">AI Analysis Engine</div>
+        <div class="az-t">Run Predictive Model</div>
+        <div class="az-d">Simulate updated groundwater conditions using satellite telemetry, climate projections, and extraction data.</div>
+      </div>
+      <div class="az-r">
+        <button id="abtn" onclick="runAn(event)"><span class="bg"></span>⚡ Analyze Now</button>
+        <div id="lrow"><div class="sp"></div><span id="lmsg">Processing...</span></div>
+        <div class="rc-count" id="rcc">Model runs: 0 of 2 available</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// Date
+const nd = new Date();
+document.getElementById('topdate').textContent = nd.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
+
+// Sparklines
+function spark(id, data, color) {
+  const c = document.getElementById(id);
+  if(!c) return;
+  new Chart(c, {
+    type:'line',
+    data:{labels:data.map((_,i)=>i),datasets:[{data,borderColor:color,borderWidth:1.5,pointRadius:0,tension:.4,fill:true,backgroundColor:color.replace('rgb(','rgba(').replace(')',',0.08)')}]},
+    options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{display:false},tooltip:{enabled:false}},scales:{x:{display:false},y:{display:false}}}
+  });
+}
+spark('sp1',[1.8,2.0,2.2,2.6,3.0,3.5,3.8,4.2],'rgb(0,212,255)');
+spark('sp2',[310,295,280,268,255,248,238,230],'rgb(0,255,200)');
+spark('sp3',[2.0,2.1,2.2,2.2,2.3,2.4,2.5,2.6],'rgb(255,176,32)');
+spark('sp4',[1,1,2,2,2,3,3,3],'rgb(255,61,90)');
+
+// Main chart
+const ctx = document.getElementById('mc').getContext('2d');
+const cg = ctx.createLinearGradient(0,0,0,198);
+cg.addColorStop(0,'rgba(0,212,255,.2)'); cg.addColorStop(1,'rgba(0,212,255,0)');
+let mc = new Chart(ctx, {
+  type:'line',
+  data:{
+    labels:['2019','2020','2021','2022','2023','2024','2025','2026 ↗'],
+    datasets:[{label:'Depth',data:[-2.1,-2.4,-2.6,-2.9,-3.2,-3.5,-3.8,-4.2],borderColor:'#00d4ff',backgroundColor:cg,borderWidth:2,pointBackgroundColor:'#00d4ff',pointBorderColor:'#03060d',pointBorderWidth:2,pointRadius:4,pointHoverRadius:7,tension:.4,fill:true}]
+  },
+  options:{responsive:true,maintainAspectRatio:false,animation:{duration:900,easing:'easeInOutQuart'},plugins:{legend:{display:false},tooltip:{backgroundColor:'rgba(6,13,26,.96)',borderColor:'rgba(0,212,255,.28)',borderWidth:1,titleColor:'#f0f8ff',bodyColor:'#8aa8c8',padding:10,callbacks:{label:c=>` ${c.parsed.y} m below surface`}}},scales:{x:{grid:{color:'rgba(255,255,255,.04)'},ticks:{color:'#4a6880',font:{size:11}}},y:{reverse:true,grid:{color:'rgba(255,255,255,.04)'},ticks:{color:'#4a6880',font:{size:11},callback:v=>v+' m'}}}}
+});
+
+// Map tooltips
+const mtt = document.getElementById('mtt');
+const mw = document.querySelector('.mw');
+document.querySelectorAll('.rg').forEach(el=>{
+  el.style.cursor='pointer';
+  el.addEventListener('mousemove',e=>{
+    const r = mw.getBoundingClientRect();
+    const ico = {safe:'🟢',risk:'🟡',critical:'🔴'}[el.dataset.s];
+    mtt.innerHTML = `<b>${el.dataset.n}</b> &nbsp;${ico}&nbsp; ${el.dataset.v}`;
+    mtt.style.opacity='1';
+    mtt.style.left=(e.clientX-r.left+14)+'px';
+    mtt.style.top=(e.clientY-r.top-12)+'px';
+  });
+  el.addEventListener('mouseleave',()=>mtt.style.opacity='0');
+});
+
+// Scenarios
+const SC = [
+  {
+    wi:72,wc:'ok',ws:'/ 100 · Stable',wp:'linear-gradient(90deg,var(--safe),var(--c2))',
+    kv:['−4.2 m','248 mm','2.4 km³','3 / 14'],kd:['▼ 0.8m / yr','▼ 12% YoY','▲ 6% quota','5 regions'],
+    ch:[-2.1,-2.4,-2.6,-2.9,-3.2,-3.5,-3.8,-4.2],cc:'#00d4ff',
+    fcv:'−20% water level',fvc:'wn',fcb:'74% confidence',
+    fct:'Water levels are projected to <span class="hl">decrease by 20%</span> over the next <span class="hl">3 years</span> based on current precipitation deficits.<br><br>Primary risk zones: <span class="hlr">Kyzylorda, Mangystau, West Kazakhstan</span>. Continued overuse may cause irreversible desertification.',
+    fcc:'74',fcl:'Model confidence: 74%',
+    rb:'AI-generated',rbc:'bg-ai',
+    recs:[{c:'',n:'1',t:'Reduce Domestic Usage',d:'Tiered pricing to cut household use 15–20%. Campaigns in Shymkent and Kyzylorda.'},{c:'',n:'2',t:'Optimize Irrigation',d:'Transition to drip irrigation in Turkestan & Zhambyl. Savings: 35–45% per season.'},{c:'',n:'3',t:'Monitor Water Quality',d:'Deploy 40 sensors in western regions. Increase sampling in Mangystau and Atyrau.'}]
+  },
+  {
+    wi:56,wc:'wn',ws:'/ 100 · At Risk',wp:'linear-gradient(90deg,var(--warn),#ffda6b)',
+    kv:['−5.9 m','201 mm','2.9 km³','6 / 14'],kd:['▼ 1.7m / yr','▼ 28% YoY','▲ 21% quota','7 regions'],
+    ch:[-2.6,-3.0,-3.5,-4.1,-4.7,-5.2,-5.9,-6.5],cc:'#ffb020',
+    fcv:'−32% water level',fvc:'wn',fcb:'81% confidence',
+    fct:'Groundwater is deteriorating faster than baseline. A <span class="hl">32% decline</span> is forecast within <span class="hl">3 years</span> if extraction continues.<br><br>Zones expanded to: <span class="hlr">Kyzylorda, Mangystau, Atyrau, Turkestan</span>. Emergency regulatory intervention recommended within 6 months.',
+    fcc:'81',fcl:'Model confidence: 81%',
+    rb:'⚠️ Urgent',rbc:'bg-wn',
+    recs:[{c:'urg',n:'!',t:'Emergency Extraction Caps',d:'Enforce limits in Kyzylorda & Mangystau. Aquifer collapse in 5–8 years without action.'},{c:'',n:'2',t:'Rainwater Harvesting',d:'Scale national infrastructure. Potential to offset 8–12% of annual groundwater demand.'},{c:'',n:'3',t:'Update Water Regulations',d:'Modernize the 2003 Water Code with digital permitting and real-time quota tracking.'}]
+  },
+  {
+    wi:38,wc:'bd',ws:'/ 100 · Critical',wp:'linear-gradient(90deg,var(--crit),#ff8fa0)',
+    kv:['−9.8 m','162 mm','3.6 km³','9 / 14'],kd:['▼ 3.1m / yr','▼ 44% YoY','▲ 50% quota','9 regions'],
+    ch:[-3.5,-4.2,-5.0,-6.1,-7.2,-8.5,-9.8,-11.4],cc:'#ff3d5a',
+    fcv:'−48% water level',fvc:'bd',fcb:'89% confidence',
+    fct:'<span class="hlr">CRITICAL ALERT:</span> Aquifer levels near irreversible depletion. A catastrophic <span class="hlr">48% decline</span> is projected within <span class="hlr">2 years</span>.<br><br>Emergency response required across <span class="hlr">9 of 14 regions</span>. UN intervention and international aid urgently recommended.',
+    fcc:'89',fcl:'Model confidence: 89%',
+    rb:'🔴 Emergency',rbc:'bg-cr',
+    recs:[{c:'urg',n:'!',t:'HALT Industrial Extraction',d:'Immediate suspension of non-essential industrial use across 5 critical regions.'},{c:'urg',n:'!',t:'Build Desalination Plants',d:'Fast-track Caspian desalination. Est. cost: $2.8B. Required online by 2027.'},{c:'urg',n:'!',t:'UN Emergency Notification',d:'Notify UNEP immediately. Apply for emergency climate adaptation funding.'}]
+  }
+];
+
+let runs = 0;
+const MSGS = ['Loading satellite telemetry…','Analyzing aquifer readings…','Running climate models…','Calculating extraction impact…','Generating AI forecast…','Compiling risk assessment…'];
+
+function runAn(e) {
+  if(runs>=2) return;
+  const btn = document.getElementById('abtn');
+  const lr = document.getElementById('lrow');
+  const lm = document.getElementById('lmsg');
+  // ripple
+  const rp = document.createElement('span'); rp.className='rpe';
+  const sz = Math.max(btn.offsetWidth,btn.offsetHeight);
+  const br = btn.getBoundingClientRect();
+  rp.style.cssText=`width:${sz}px;height:${sz}px;left:${e.clientX-br.left-sz/2}px;top:${e.clientY-br.top-sz/2}px`;
+  btn.appendChild(rp); setTimeout(()=>rp.remove(),700);
+  btn.disabled=true; lr.classList.add('on');
+  let mi=0; const iv=setInterval(()=>{lm.textContent=MSGS[mi++%MSGS.length];},370);
+  setTimeout(()=>{
+    clearInterval(iv); lr.classList.remove('on'); btn.disabled=false;
+    runs++; apply(SC[runs]);
+    document.getElementById('rcc').textContent = runs>=2 ? 'Model runs: 2 of 2 — max reached' : `Model runs: ${runs} of 2 available`;
+    if(runs>=2){btn.textContent='✓ Analysis Complete';btn.style.background='linear-gradient(135deg,rgba(255,61,90,.65),rgba(160,15,45,.65))';}
+  }, 1500+Math.random()*550);
+}
+
+function apply(sc) {
+  const wn = document.getElementById('win');
+  animN(wn, parseInt(wn.textContent), sc.wi, 900);
+  wn.className='win '+sc.wc;
+  document.getElementById('wis').textContent=sc.ws;
+  document.getElementById('wip').style.cssText=`width:${sc.wi}%;background:${sc.wp}`;
+  ['kv1','kv2','kv3','kv4'].forEach((id,i)=>snap(id,sc.kv[i]));
+  ['d1','d2','d3','d4'].forEach((id,i)=>snap(id,sc.kd[i]));
+  // chart
+  const ng = ctx.createLinearGradient(0,0,0,198);
+  ng.addColorStop(0,sc.cc+'33'); ng.addColorStop(1,sc.cc+'00');
+  mc.data.datasets[0].data=sc.ch; mc.data.datasets[0].borderColor=sc.cc;
+  mc.data.datasets[0].backgroundColor=ng; mc.data.datasets[0].pointBackgroundColor=sc.cc;
+  mc.update();
+  // forecast
+  snap('fcv',sc.fcv); document.getElementById('fcv').className='fcs-v '+sc.fvc;
+  document.getElementById('fcbadge').textContent=sc.fcb;
+  document.getElementById('fct').innerHTML=sc.fct; snap('fct',null,true);
+  document.getElementById('fccl').textContent=sc.fcl;
+  document.getElementById('ccf').style.width=sc.fcc+'%';
+  // recs
+  const rb=document.getElementById('rbadge'); rb.textContent=sc.rb; rb.className='gbg '+sc.rbc;
+  const rl=document.getElementById('rl');
+  rl.innerHTML=sc.recs.map(r=>`<div class="rc ${r.c}"><div class="rn">${r.n}</div><div><div class="rt">${r.t}</div><div class="rd">${r.d}</div></div></div>`).join('');
+  rl.classList.remove('snap'); void rl.offsetWidth; rl.classList.add('snap');
+}
+
+function snap(id,val,skp=false) {
+  const el=document.getElementById(id); if(!el) return;
+  if(!skp&&val!==null) el.textContent=val;
+  el.classList.remove('snap'); void el.offsetWidth; el.classList.add('snap');
+}
+
+function animN(el,from,to,dur) {
+  const s=performance.now();
+  (function step(now){
+    const p=Math.min((now-s)/dur,1), e=1-Math.pow(1-p,3);
+    el.textContent=Math.round(from+(to-from)*e);
+    if(p<1) requestAnimationFrame(step);
+  })(performance.now());
+}
+// Блокировка автоскролла при клике на пустые ссылки в сайдбаре
+document.querySelectorAll('a[href="#"]').forEach(link => {
+  link.addEventListener('click', e => e.preventDefault());
+});
+</script>
+</body>
+</html>
